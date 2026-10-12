@@ -4,7 +4,9 @@ import com.hamza.ebankservice.entities.BankAccount;
 import com.hamza.ebankservice.repository.BankAccountRepository;
 import org.springframework.stereotype.Service;
 
+import java.util.Date;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 public class EbankService {
@@ -23,6 +25,8 @@ public class EbankService {
     }
 
     public BankAccount saveBankAccount(BankAccount bankAccount) {
+        bankAccount.setId(UUID.randomUUID().toString());
+        bankAccount.setCreatedAt(new Date());
         return bankAccountRepository.save(bankAccount);
     }
 
