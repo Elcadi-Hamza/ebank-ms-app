@@ -2,7 +2,7 @@ package com.hamza.customerservice.controllers;
 
 import com.hamza.customerservice.entities.Customer;
 import com.hamza.customerservice.service.CustomerService;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -14,15 +14,18 @@ public class CustomerRestController {
         this.customerService = customerService;
     }
 
+    @GetMapping("/customers")
     public List<Customer> getAllCustomers() {
         return customerService.getAllCustomers();
     }
 
-    public Customer findCustomerById(Long id) {
+    @GetMapping("/customers/{id}")
+    public Customer findCustomerById(@PathVariable Long id) {
         return customerService.findCustomerById(id);
     }
 
-    public Customer saveCustomer(Customer customer){
+    @PostMapping("/customers")
+    public Customer saveCustomer(@RequestBody Customer customer){
         return customerService.saveCustomer(customer);
     }
 }
