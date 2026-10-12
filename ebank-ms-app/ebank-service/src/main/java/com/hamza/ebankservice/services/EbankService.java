@@ -2,6 +2,7 @@ package com.hamza.ebankservice.services;
 
 import com.hamza.ebankservice.entities.BankAccount;
 import com.hamza.ebankservice.feign.CustomerRestClient;
+import com.hamza.ebankservice.model.Customer;
 import com.hamza.ebankservice.repository.BankAccountRepository;
 import org.springframework.stereotype.Service;
 
@@ -31,9 +32,15 @@ public class EbankService {
     }
 
     public BankAccount saveBankAccount(BankAccount bankAccount) {
-        bankAccount.setId(UUID.randomUUID().toString());
-        bankAccount.setCreatedAt(new Date());
-        return bankAccountRepository.save(bankAccount);
+        try {
+            Customer customer = customerRestClient.getCustomerById(bankAccount.getCustomerId());
+            bankAccount.setId(UUID.randomUUID().toString());
+            bankAccount.setCreatedAt(new Date());
+            return bankAccountRepository.save(bankAccount);
+        } catch (Exception e) {
+            throw new RuntimeException(e.getMessage());
+
+        }
     }
 
 //    public List<BankAccount> getBankAccountsByCustomerId(Long id) {
