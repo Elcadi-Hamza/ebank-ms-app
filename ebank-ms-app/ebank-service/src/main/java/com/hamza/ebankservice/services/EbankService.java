@@ -1,6 +1,7 @@
 package com.hamza.ebankservice.services;
 
 import com.hamza.ebankservice.entities.BankAccount;
+import com.hamza.ebankservice.feign.CustomerRestClient;
 import com.hamza.ebankservice.repository.BankAccountRepository;
 import org.springframework.stereotype.Service;
 
@@ -11,8 +12,11 @@ import java.util.UUID;
 @Service
 public class EbankService {
     BankAccountRepository bankAccountRepository;
-    public EbankService(BankAccountRepository bankAccountRepository) {
+    CustomerRestClient customerRestClient;
+    public EbankService(BankAccountRepository bankAccountRepository, CustomerRestClient customerRestClient) {
         this.bankAccountRepository = bankAccountRepository;
+        this.customerRestClient = customerRestClient;
+
     }
 
     public List<BankAccount> getAllBankAccounts() {
@@ -20,8 +24,10 @@ public class EbankService {
     }
 
     public BankAccount getBankAccountById(String id) {
-        return bankAccountRepository.findById(id)
+        BankAccount bankAccount =  bankAccountRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("bankAccount not found"));
+        bankAccount.setCustomer(customerRestClient.getCustomerById(bankAccount.getCustomerId()));
+        return bankAccount;
     }
 
     public BankAccount saveBankAccount(BankAccount bankAccount) {
@@ -30,7 +36,7 @@ public class EbankService {
         return bankAccountRepository.save(bankAccount);
     }
 
-    public List<BankAccount> getBankAccountsByCustomerId(Long id) {
-        return bankAccountRepository.findByCustomerId(id);
-    }
+//    public List<BankAccount> getBankAccountsByCustomerId(Long id) {
+//        return bankAccountRepository.findByCustomerId(id);
+//    }
 }

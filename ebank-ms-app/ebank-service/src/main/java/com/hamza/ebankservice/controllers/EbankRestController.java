@@ -28,8 +28,8 @@ public class EbankRestController {
         return ebankService.saveBankAccount(bankAccount);
     }
 
-    @GetMapping("/customer/accounts/{id}")
-    public List<BankAccount> getBankAccountsByCustomerId(@PathVariable Long id) {
-        return ebankService.getBankAccountsByCustomerId(id);
-    }
+//    @GetMapping("/customer/accounts/{id}")
+//    public List<BankAccount> getBankAccountsByCustomerId(@PathVariable Long id) {
+//        return ebankService.getBankAccountsByCustomerId(id);
+//    }
 }
