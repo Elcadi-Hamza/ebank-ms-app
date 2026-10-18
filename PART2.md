@@ -92,8 +92,120 @@ public EbankChatbotController(ChatClient.Builder chatClient, ChatMemory chatMemo
             .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
             .build();
 }
+@GetMapping("/chat")
+public String chat(
+        @RequestParam(name = "query", defaultValue = "Bonjour") String query,
+        @RequestParam(name = "conversationId", defaultValue = "default") String conversationId) {
+
+    return chatClient.prompt()
+            .user(query)
+            .advisors(advisor -> advisor.param(
+                    ChatMemory.CONVERSATION_ID, conversationId))
+            .call()
+            .content();
+}
+```
+![http://localhost:8083/swagger-ui/index.html testing](screenShots/23.png) \
+![http://localhost:8083/swagger-ui/index.html testing](screenShots/24.png) \
+alors LLM a une memory maintenant car il memeroiser mon nom. \
+Maintenant on creer une class `EbankAIAgent` dans la package `agents`.
+```java
+@Service
+public class EbankAIAgent {
+    private final ChatClient chatClient;
+
+    public EbankAIAgent(
+            ChatClient.Builder chatClient,
+            ChatMemory chatMemory) {
+
+        this.chatClient = chatClient
+                .defaultAdvisors(
+                        MessageChatMemoryAdvisor.builder(chatMemory).build())
+                .build();
+    }
+    public String chat(String query, String conversationId) {
+
+        return chatClient.prompt()
+                .user(query)
+                .advisors(advisor -> advisor.param(
+                        ChatMemory.CONVERSATION_ID, conversationId))
+                .call()
+                .content();
+    }
+}
+```
+puis on changer `EbankChatbotController`
+```java
+@RestController
+public class EbankChatbotController {
+
+    EbankAIAgent ebankAIAgent;
+    public EbankChatbotController(EbankAIAgent ebankAIAgent) {
+        this.ebankAIAgent = ebankAIAgent;
+    }
+
+
+    @GetMapping("/chat")
+    public String chat(
+            @RequestParam(name = "query", defaultValue = "Bonjour") String query,
+            @RequestParam(name = "conversationId", defaultValue = "default") String conversationId) {
+
+        return ebankAIAgent.chat(query, conversationId);
+    }
+}
 ```
 
+## 2 - Exposition les fonctionnalités des micro-services via MCP
+On ajoutant `MCP` (model context protocle server) dans `customer-service` \
+```xml
+<dependency>
+    <groupId>org.springframework.ai</groupId>
+    <artifactId>spring-ai-starter-mcp-server-webmvc</artifactId>
+</dependency>
+```
+On ajoutons dans `CustomerService` l'annotation `@MCPTool` ca make le service des tools qui l'agent ai peut ituliser.
+```java
+@Service
+public class CustomerService {
+    private CustomerRepository customerRepository;
+
+    public CustomerService(CustomerRepository customerRepository){
+        this.customerRepository = customerRepository;
+    }
+
+    @McpTool(description = "Get all customers")
+    public List<Customer> getAllCustomers() {
+        return customerRepository.findAll();
+    }
+
+    @McpTool(description = "Find a customer by id")
+    public Customer findCustomerById(@McpToolParam(description = "The customer id") Long id) {
+        return customerRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Customer "+id+" not found"));
+    }
+
+    @McpTool(description = "Save new customer")
+    public Customer saveCustomer(@McpToolParam(description = "The customer to save (name, email)") Customer customer){
+        return customerRepository.save(customer);
+    }
+}
+```
+n'importe qu'il agent connais l'adresss de service peut acceder au methode via mcp. \
+on ajoutons la configuration mcp dans le micro-service `customer-service`
+```properties
+spring.ai.mcp.server.protocol=streamable
+```
+`streamable` permet de faire une communication biderctionell entre l'agent et le micro-service.
+
+## 3 - Tester les micro-services via MCP Client
+On le tester via `Postman`.
+
+## 4 - Connecter le chatbot avec les micro-servicew avec MCP
+on ajoutans la dependace de 
+
+## 5 - Tester le chatbot avec un client REST
+## 6 - Tester le chatbot avec un Client Telegram
+## 7 - Tester le chatbot avec un client Discord
 
 
 
