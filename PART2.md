@@ -201,170 +201,344 @@ spring.ai.mcp.server.protocol=streamable
 On le tester via `Postman`.
 
 ## 4 - Connecter le chatbot avec les micro-servicew avec MCP
-on ajoutans la dependace de 
-
-## 5 - Tester le chatbot avec un client REST
-## 6 - Tester le chatbot avec un Client Telegram
-## 7 - Tester le chatbot avec un client Discord
-
-
-
-
-
-
-
-
-## 2 - Développement de service Customer-Service
-On Créer le micro service `customer-service` : \
-![Création du micro service customer-service](screenShots/2.png) \
-
-Avec les dépendances suivantes :
-- **Spring Web**
-- **Spring Data JPA**
-- **H2 Database**
-- **Lombok**
-- **Rest Repository**
-- **Eureka Discovery Client**
-- **Config Client**
-- **Spring Boot Actuator** \
-
-apres la creation de entitie `Customer` et repository `CustomerRepository`, et la configuration de `application.properties` avec numero de port `8081` et l'ajoute des clients dans `CustomerServiceApplication` utilisons le `CommandeLineRunner`. \
-on tester
-
-![customer json reponse](screenShots/3.png) \
-On ajoutons la dependance swager : \
+on ajoutans la dependace de `mcp-client` dans `ebank-bot` service
 ```xml
-   <dependency>
-      <groupId>org.springdoc</groupId>
-      <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-      <version>3.1.1</version>
-   </dependency>
+dependency>
+    <groupId>org.springframework.ai</groupId>
+    <artifactId>spring-ai-starter-mcp-client</artifactId>
+</dependency>
 ```
-![customer swager documetation](screenShots/4.png) \
-
-## 3 - Développement de service EBank-Service
-On Créer le micro service `Ebank-service` : \
-![Création du micro service ebank-service](screenShots/5.png) \
-
-Avec les dépendances suivantes :
-- **Spring Web**
-- **Spring Data JPA**
-- **H2 Database**
-- **Lombok**
-- **Eureka Discovery Client**
-- **Config Client**
-- **Spring Boot Actuator** \
-
-apres la creation de entitie `BankAccount` et repository `BankAccountRepository`, et la configuration de `application.properties` avec numero de port `8082` et l'ajoute des clients dans `EbankServiceApplication` utilisons le `CommandeLineRunner`. \
-on tester
-
-![BankAccount json reponce](screenShots/6.png) \
-
-On ajoutons la dependance swager : \
-```xml
-   <dependency>
-      <groupId>org.springdoc</groupId>
-      <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-      <version>3.1.1</version>
-   </dependency>
+puis on configurer
+```properties
+spring.ai.mcp.client.streamable-http.connections.customers.url=http://localhost:8081/mcp
 ```
-![BankAccount swager documetation](screenShots/7.png) \
-
-# 4 - Communication avce les deux services avec Open FEIGN et Fault Tolerance avec Circuit Breaker : Resilience4J
-On ajoutons la dependance de `openFeign` dans le microservice `ebank-service`, apres on ajoutans
-le package `feign` et l'interface `CustomerRestClient` \
-
+puis on ajoutans dans `EbankAIAgent` service la fonctionaliter de au demarage il va chercher les tools 
 ```java
-@FeignClient(name = "customer-service")
-public interface CustomerRestClient {
-    @GetMapping("/customers/{id}")
-    @CircuitBreaker(name="customerService", fallbackMethod = "getDefaultCustomer")
-    Customer getCustomerById(@PathVariable Long id);
+public EbankAIAgent(
+        ChatClient.Builder chatClient,
+        ChatMemory chatMemory,
+        ToolCallbackProvider tools) {
 
-    default Customer getDefaultCustomer(Long id, Exception e) {
-        return new Customer(id, "NoName", "NoEmail");
+    this.chatClient = chatClient
+            .defaultAdvisors(
+                    MessageChatMemoryAdvisor.builder(chatMemory).build())
+//                .defaultToolCallbacks(tools)
+            .defaultTools(tools)
+            .build();
+}
+```
+On le teste, on le demande liste des clients :
+![http://localhost:8083/swagger-ui/index.html testing avec liste des clients](screenShots/25.png) \
+
+On le demande de `nom de client numero 1`
+![http://localhost:8083/swagger-ui/index.html testing avec save un client](screenShots/26.png) \
+
+Maintenant on va deliminer et limiter chatbot pour juste repondre au question concerner les client el les comptes \
+On ajoutons `defaultSystem` dans `EbankAIAgent`
+```java
+public EbankAIAgent(
+        ChatClient.Builder chatClient,
+        ChatMemory chatMemory,
+        ToolCallbackProvider tools) {
+
+    this.chatClient = chatClient
+            .defaultSystem("""
+                    Vous un assistant qui se charge de repondre aux question
+                    de l'utilsateur a propos des clients et des compte bancaires, en fonction du contexte fourni.
+                    Si aucun contexte n'est fourni, repond avec JE NE SAIT PAS.
+                    """)
+            .defaultAdvisors(
+                    MessageChatMemoryAdvisor.builder(chatMemory).build())
+//                .defaultToolCallbacks(tools)
+            .defaultTools(tools)
+            .build();
+}
+```
+On le test avec la prompt `je veux manger`
+![http://localhost:8083/swagger-ui/index.html testing avec prompt hors context](screenShots/27.png) \
+
+On fait la meme chose avec `Ebank-service` \
+On ajoutons le depandence `mcp`
+```xml
+<dependency>
+    <groupId>org.springframework.ai</groupId>
+    <artifactId>spring-ai-starter-mcp-server-webmvc</artifactId>
+</dependency>
+```
+Puis on ajoutons les annotations de `MCP` dans `EbankService`
+```java
+@Service
+public class EbankService {
+    BankAccountRepository bankAccountRepository;
+    CustomerRestClient customerRestClient;
+    public EbankService(BankAccountRepository bankAccountRepository, CustomerRestClient customerRestClient) {
+        this.bankAccountRepository = bankAccountRepository;
+        this.customerRestClient = customerRestClient;
+
+    }
+
+    @McpTool(description = "Get all Bank accounts")
+    public List<BankAccount> getAllBankAccounts() {
+        return bankAccountRepository.findAll();
+    }
+
+    @McpTool(description = "Get Bank Account by id")
+    public BankAccount getBankAccountById(@McpToolParam(description = "The bank account id") String id) {
+        BankAccount bankAccount =  bankAccountRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("bankAccount not found"));
+        bankAccount.setCustomer(customerRestClient.getCustomerById(bankAccount.getCustomerId()));
+        return bankAccount;
+    }
+
+    @McpTool(description = "save a customer")
+    public BankAccount saveBankAccount(@McpToolParam(description = "The bank account to save ()") BankAccount bankAccount) {
+        try {
+            Customer customer = customerRestClient.getCustomerById(bankAccount.getCustomerId());
+            bankAccount.setId(UUID.randomUUID().toString());
+            bankAccount.setCreatedAt(new Date());
+            return bankAccountRepository.save(bankAccount);
+        } catch (Exception e) {
+            throw new RuntimeException(e.getMessage());
+
+        }
     }
 }
 ```
-on ajoutons la notation de `openFeign` dans `EbamkServiceApplication`
-```java
-@EnableFeignClients
+et on ajoutons mcp dans `application.properties`
+```properties
+spring.ai.mcp.client.streamable-http.connections.ebank.url=http://localhost:8082/mcp
 ```
-avec `CircuitBreaker` qui gerer lorsque le `customer-service` est n'est pas fonctioner. \
-pour utiliser `CircuitBreaker` il faut ajouter la depandance.
-![Accounts with Customers json responce](screenShots/17.png) \
-![Accounts with Customers json responce if customer service not functioning](screenShots/18.png) \
+Remarque : Comme la clé API fournie sur Classroom a été publiée sur GitHub et qu’elle n’est désormais plus fonctionnelle, et que les limites d’utilisation de Gemini sont rapidement atteintes, 
+je ne peux pas fournir de captures d’écran illustrant le fonctionnement du chatbot.
 
-# 5 - Développement de gateway
-On Créer le gateway `gateway-service` : \
-![Gateway service](screenShots/8.png) \
-
-Avec les dépendances suivantes :
-- **Reactive Gateway**
-- **Eureka Discovery Client**
-- **Spring Boot Actuator**  \
-
-On creer le gateway :
-- **static** : on creer un fichier `application.yaml`
-```yaml
-spring:
-spring:
-  cloud:
-    gateway:
-      server:
-        webflux:
-          routes:
-            - id : r1
-              uri : http://localhost:8081
-              predicates:
-                - Path= /customers/**
-            - id : r2
-              uri : http://localhost:8082
-              predicates:
-                - Path= /accounts/**
-```
-![Customers json responce](screenShots/9.png) \
-![Accounts json responce](screenShots/10.png) \
-
-- **dynamic :** dans `GatewayServiceApplication`
+on rendre l'affichage de reponse de chatbot, \
+dans `EbankChatbotController`
 ```java
-@Bean
-DiscoveryCLientRouteDefinitionLocator dynamicRoutes(ReactiveDiscoveryClient rdc,
-DiscoveryLocatorProperties dlp){
-	return new DiscoveryClientRouteDefinitionLocator(rdc,dlp);
+    @GetMapping("/chat", produces = MediaType.TEXT_PLAIN_VALUE)
+```
+
+[//]: # (output using the gateway to get clients and bank accounts)
+## 5 - Tester le chatbot avec un client Discord
+On ajoutons la dependace de `discord` dans `ebank-bot`
+```xml
+<dependency>
+    <groupId>com.zgamelogic</groupId>
+    <artifactId>spring-boot-strater-discord</artifactId>
+    <version>5.0.4</version>
+</dependency>
+```
+on creer la class `DiscordBot`
+```java
+@DiscordController
+public class DiscordBot {
+    private EbankAIAgent ebankAIAgent;
+    public DiscordBot(EbankAIAgent ebankAIAgent) {
+        this.ebankAIAgent = ebankAIAgent;
+    }
+    @DiscordMapping
+    private void perform(MessageReceiveEvent event) {
+        System.out.println(event);
+        if(event.getAuthor().isBot()) return;
+        String query = event.getMessage().getContentRaw();
+        String response = ebankAIAgent.chat(new Prompt(query));
+        event.getChannel().sendMessage(response).queue();
+    }
 }
 ```
-## 5 - Développement le Discovery Service
-On Créer `discovery-service` : \
-![Création du discovery-service](screenShots/14.png) \
+et on change `application.properties`
+```properties
+discord.token=${DISCORD_TOKEN}
+```
+pour avoir `DISCORD_TOKEN` on accceder `https://discord.com/developers/applications?new_application=true` \
+on creer une application \
+![creationo d'une application discord](screenShots/28.png) \
+puis on entrer la fentere `bot` et puis `reset token` \
+![reset token pour le bot](screenShots/29.png) \
+puis on activer les droits :
+![les droits de bot](screenShots/30.png) \
+puis on creer un serveur discord \
+![serveur discord](screenShots/31.png) \
+puis on entrer l'instalation tab dans `https://discord.com/developers/applications/`
+et on copie le lien d'application, et on ajouter le bot a un serveur. \
+![serveur discord](screenShots/32.png) \
 
-Avec les dépendances suivantes :
-- **Eureka Server**
-- **Spring Boot Actuator** //pour le monitoring du micro service \
 
-apres on ajoutons l'annotation dans `DiscoveryServiceApplication`
+
+
+## 6 - Tester le chatbot avec un Client Telegram
+On ajoutons la depandance de `telegram` dans `ebank-bot`
+```xml
+<dependency>
+    <groupId>org.telegram</groupId>
+    <artifactId>telegrambots-spring-boot-strater</artifactId>
+    <version>6.9.7.1</version>
+</dependency>
+```
+apres on creer un bot utilisant `bot-father`
+![bot father conversation](screenShots/33.png) \
+et on ajoutons dans `application.properties`
+```properties
+telegram.token=${TELEGRAM_TOKEN}
+```
+Et dans la class `telegram.TelegramBot`
 ```java
-@EnableEurekaServer
+@Component
+public class TelegramBot extends TelegramLongPollingBot {
+    @Value("${telegram.token}")
+    private String telgramBotToken;
+    private EbankAIAgent aiAgent;
+    public TelegramBot(EbankAIAgent aiAgent) {
+        this. aiAgent = aiAgent;
+    }
+    @PostConstruct
+    public void registerTelegramBot() {
+        try{
+            TelegramBotsApi api = new TelegramBotsApi(DefaultBotSession.class);
+            api.regiserBot(this);
+        } catch (TelegramApiException e) {
+            throw new RuntimeException(e);
+        }
+    }
+    @Override
+    public void onUpdateReceived(Update telegramRequest) {
+        try {
+            if(!telegramRequest.hasMessage()) return;
+            String messageText = telegramRequest.getMessage().getText();
+            Long chatId = telegramRequest.getMessage().getChatId();
+            List<PhotoSize> photos = telegramRequest.getMessage().getPhoto();
+            List<Media> mediaList = new ArrayList<>();
+            String caption = null;
+            if(photos != null) {
+                caption = telegramRequest.getMessage().getCaption();
+                if(caption == null) caption = "What do you see in this image";
+                for(PhotoSize ps : photos) {
+                    String fileId = ps.getFileId();
+                    GetFile getFile = new GetFile();
+                    getFile.setFileId(fileId);
+                    File file = execute(getFile);
+                    String filePath = file.getFilePath();
+                    String textUrl = "https://api.telegram.org/file/bot"
+                            +getBotToken()+"/"+filePath;
+                    URL fileUrl = new URL(textUrl);
+                    mediaList.add(Media.builder()
+                            .id(fileId)
+                            .mimeType(MimeTypeUtils.IMAGE_PNG)
+                            .data(new UrlResource(fileUrl))
+                            .build());
+                }
+            }
+            String query = messageText != null?messageText:caption;
+            UserMessage userMessage = UserMessage.builder()
+                    .text(query)
+                    .media(mediaList)
+                    .build();
+            sendTypingQuestion(chatId);
+            String answer = aiAgent.chat(new Prompt(userMessage));
+            sendTextMessage(chatId, answer);
+
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+}
 ```
-et avec la configuration
-```text
-spring.application.name=discovery-service
-server.port=8761
-eureka.client.fetch-registry=false
-eureka.client.register-with-eureka=false
+on update `query` from string to prompt
+dans `EbankChatbotController` \
+```java
+@GetMapping("/chat", produces = MediaType.TEXT_PLAIN_VALUE)
+    public String chat(
+            @RequestParam(name = "query", defaultValue = "Bonjour") String query,
+            @RequestParam(name = "conversationId", defaultValue = "default") String conversationId) {
+
+        return ebankAIAgent.chat(new Prompt(query), conversationId);
+    }
 ```
-et activer spring cloud discovery de tous les autre micro service (customer, inventory, et gateway)
-```text
-spring.cloud.discovery.enabled=true
+dans `DiscordBot.java`
+```java
+@Component
+public class TelegramBot extends TelegramLongPollingBot {
+    @Value("${telegram.token}")
+    private String telgramBotToken;
+    private EbankAIAgent aiAgent;
+    public TelegramBot(EbankAIAgent aiAgent) {
+        this. aiAgent = aiAgent;
+    }
+    @PostConstruct
+    public void registerTelegramBot() {
+        try{
+            TelegramBotsApi api = new TelegramBotsApi(DefaultBotSession.class);
+            api.regiserBot(this);
+        } catch (TelegramApiException e) {
+            throw new RuntimeException(e);
+        }
+    }
+    @Override
+    public void onUpdateReceived(Update telegramRequest) {
+        try {
+            if(!telegramRequest.hasMessage()) return;
+            String messageText = telegramRequest.getMessage().getText();
+            Long chatId = telegramRequest.getMessage().getChatId();
+            List<PhotoSize> photos = telegramRequest.getMessage().getPhoto();
+            List<Media> mediaList = new ArrayList<>();
+            String caption = null;
+            if(photos != null) {
+                caption = telegramRequest.getMessage().getCaption();
+                if(caption == null) caption = "What do you see in this image";
+                for(PhotoSize ps : photos) {
+                    String fileId = ps.getFileId();
+                    GetFile getFile = new GetFile();
+                    getFile.setFileId(fileId);
+                    File file = execute(getFile);
+                    String filePath = file.getFilePath();
+                    String textUrl = "https://api.telegram.org/file/bot"
+                            +getBotToken()+"/"+filePath;
+                    URL fileUrl = new URL(textUrl);
+                    mediaList.add(Media.builder()
+                            .id(fileId)
+                            .mimeType(MimeTypeUtils.IMAGE_PNG)
+                            .data(new UrlResource(fileUrl))
+                            .build());
+                }
+            }
+            String query = messageText != null?messageText:caption;
+            UserMessage userMessage = UserMessage.builder()
+                    .text(query)
+                    .media(mediaList)
+                    .build();
+            sendTypingQuestion(chatId);
+            String answer = aiAgent.chat(new Prompt(userMessage));
+            sendTextMessage(chatId, answer);
+
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public String getBotUsername(){return "ebank_137_bot";}
+
+    @Override
+    public String getBotToken() {return telgramBotToken;}
+
+    public void sendTextMessage(Long chatId, String text) throws TelegramApiException {
+        SendMessage sendMessage = new SendMessage(String.valueOf(chatId), text);
+        execute(sendMessage);
+    }
+
+    private void sendTypingQuestion(Long chatId)throws TelegramApiException{
+        SendChatAction sendChatAction = new SendChatAction();
+        sendChatAction.setChatId(String.valueOf(chatId));
+        sendChatAction.setAction(ActionType.TYPING);
+        execute(sendChatAction);
+
+    }
+}
 ```
-on le test
-![eurika test](screenShots/15.png)
-et on teste le gateway dynamique :
-![/INVENTORY-SERVICE/products](screenShots/16.png)
-![/CUSTOMER-SERVICE/customers](screenShots/17.png)
-```text
-NOTE : il faut ajouter dans application.properties de les deux micro service inventory-service
-et customer-service :
-eureka.instance.prefer-ip-address=true
-pour ils fonctions avec gateway dynamique.
+puis on resoudere le conflit entre `telegram` et `discovery-service` \
+dans le fichier `application.properties` on ajoutons
+```properties
+eureka.client.jersey.enabled=flase
 ```
+le discovery-service  a creer ce bean, c'est parce que on n'a pas besoin de creer dans telegram.
+
+[//]: # (image de tesing le bot utilisant telegram)
