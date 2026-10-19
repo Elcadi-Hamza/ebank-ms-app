@@ -1,4 +1,4 @@
-# Rapport de Projet - Systèmes Distribués - PART 01
+# Rapport de Projet - Systèmes Distribués - PARTIE 01
 
 **Référence :** https://www.youtube.com/watch?v=JHvxSZTWSsY
 **Réalisé par :** HAMZA ELCADI - GLSID3
@@ -7,18 +7,18 @@
 
 ## 1 - Développer l'Agent AI basé sur Spring AI
 
-On Créer un module spring boot `ebank-bot` :
+On crée un module Spring Boot `ebank-bot` :
 
 ![Création du module](screenShots/19.png)
 
 Avec les dépendances suivantes :
 - **Spring Web**
-- **OpenAi**
+- **OpenAI**
 - **Eureka Discovery Client**
 - **Config Client**
 - **Spring Boot Actuator** \
 
-On configurer le fichier `application.properties`
+On configure le fichier `application.properties` :
 ```properties
 spring.application.name=ebank-bot
 spring.ai.openai.api-key=API_KEY
@@ -27,7 +27,7 @@ spring.cloud.discovery.enabled=true
 spring.cloud.config.enabled=false
 server.port=8083
 ```
-On creer `EbankChatBotController`
+On crée `EbankChatbotController` :
 ```java
 @RestController
 public class EbankChatbotController {
@@ -41,8 +41,8 @@ public class EbankChatbotController {
     }
 }
 ```
-On utilisant la documetation swager : \
-on ajoutons la dependance `Openapi`:
+On utilise la documentation Swagger : \
+on ajoute la dépendance `OpenAPI` :
 ```xml
    <dependency>
       <groupId>org.springdoc</groupId>
@@ -51,25 +51,25 @@ on ajoutons la dependance `Openapi`:
    </dependency>
 ```
 
-on lance `discovery-client` et `Ebank-bot` services, puis on entrere `http://localhost:8083/chat?query=hello`
+On lance les services `discovery-client` et `Ebank-bot`, puis on accède à `http://localhost:8083/chat?query=hello`.
 ![http://localhost:8083/chat?query=hello](screenShots/20.png) \
-Note : la page n'est pas fonctioner a cause de cetter erreur : \
+Note : la page ne fonctionne pas à cause de cette erreur : \
 ```text
 
 2026-10-18T00:39:32.434+01:00 ERROR 17472 --- [ebank-bot] [nio-8083-exec-3] o.a.c.c.C.[.[.[/].[dispatcherServlet]    : Servlet.service() for servlet [dispatcherServlet] in context with path [] 
 threw exception [Request processing failed: com.openai.errors.RateLimitException: 429: 
 You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.] with root cause
 ```
-il dit que 'You have no credits remaining. Add credits to continue using the API'
-donc on va utiliser `Gemini`
-- 1 : on ajoutans la depandance
+Elle indique que 'You have no credits remaining. Add credits to continue using the API', c'est-à-dire qu'il n'y a plus de crédits.
+Donc on va utiliser `Gemini`.
+- 1 : on ajoute la dépendance
 ```xml
 <dependency>
     <groupId>org.springframework.ai</groupId>
     <artifactId>spring-ai-starter-model-google-genai</artifactId>
 </dependency>
 ```
-- 2 : on change `application.properties`
+- 2 : on modifie `application.properties`
 ```properties
 spring.application.name=ebank-bot
 #spring.ai.openai.api-key=${API_KEY}
@@ -80,12 +80,12 @@ spring.cloud.discovery.enabled=true
 spring.cloud.config.enabled=false
 server.port=8083
 ```
-On le teste `http://localhost:8083/chat?query=hello` \
+On le teste avec `http://localhost:8083/chat?query=hello` \
 ![http://localhost:8083/chat?query=hello](screenShots/21.png) \
-on voir la documentation `swager` \
+On consulte la documentation `Swagger` : \
 ![http://localhost:8083/swagger-ui/index.html](screenShots/22.png) \
-Note : llm est stateless c-a-d n'a pas de memory. \
-On ajoutons une memory pour llm.
+Note : le LLM est stateless, c'est-à-dire qu'il n'a pas de mémoire. \
+On ajoute donc une mémoire au LLM.
 ```java
 public EbankChatbotController(ChatClient.Builder chatClient, ChatMemory chatMemory) {
     this.chatClient = chatClient
@@ -105,10 +105,10 @@ public String chat(
             .content();
 }
 ```
-![http://localhost:8083/swagger-ui/index.html testing](screenShots/23.png) \
-![http://localhost:8083/swagger-ui/index.html testing](screenShots/24.png) \
-alors LLM a une memory maintenant car il memeroiser mon nom. \
-Maintenant on creer une class `EbankAIAgent` dans la package `agents`.
+![http://localhost:8083/swagger-ui/index.html test](screenShots/23.png) \
+![http://localhost:8083/swagger-ui/index.html test](screenShots/24.png) \
+Le LLM a donc maintenant une mémoire, car il a retenu mon nom. \
+Maintenant, on crée une classe `EbankAIAgent` dans le package `agents`.
 ```java
 @Service
 public class EbankAIAgent {
@@ -134,7 +134,7 @@ public class EbankAIAgent {
     }
 }
 ```
-puis on changer `EbankChatbotController`
+Puis on modifie `EbankChatbotController` :
 ```java
 @RestController
 public class EbankChatbotController {
@@ -155,15 +155,15 @@ public class EbankChatbotController {
 }
 ```
 
-## 2 - Exposition les fonctionnalités des micro-services via MCP
-On ajoutant `MCP` (model context protocle server) dans `customer-service` \
+## 2 - Exposition des fonctionnalités des micro-services via MCP
+On ajoute le serveur `MCP` (Model Context Protocol) dans `customer-service` : \
 ```xml
 <dependency>
     <groupId>org.springframework.ai</groupId>
     <artifactId>spring-ai-starter-mcp-server-webmvc</artifactId>
 </dependency>
 ```
-On ajoutons dans `CustomerService` l'annotation `@MCPTool` ca make le service des tools qui l'agent ai peut ituliser.
+On ajoute dans `CustomerService` l'annotation `@McpTool`, qui transforme les méthodes du service en outils que l'agent AI peut utiliser.
 ```java
 @Service
 public class CustomerService {
@@ -190,29 +190,29 @@ public class CustomerService {
     }
 }
 ```
-n'importe qu'il agent connais l'adresss de service peut acceder au methode via mcp. \
-on ajoutons la configuration mcp dans le micro-service `customer-service`
+N'importe quel agent qui connaît l'adresse du service peut accéder à ces méthodes via MCP. \
+On ajoute la configuration MCP dans le micro-service `customer-service` :
 ```properties
 spring.ai.mcp.server.protocol=streamable
 ```
-`streamable` permet de faire une communication biderctionell entre l'agent et le micro-service.
+`streamable` permet une communication bidirectionnelle entre l'agent et le micro-service.
 
 ## 3 - Tester les micro-services via MCP Client
-On le tester via `Postman`.
+On le teste avec `Postman`.
 
-## 4 - Connecter le chatbot avec les micro-servicew avec MCP
-on ajoutans la dependace de `mcp-client` dans `ebank-bot` service
+## 4 - Connecter le chatbot aux micro-services avec MCP
+On ajoute la dépendance `mcp-client` dans le service `ebank-bot` :
 ```xml
 dependency>
     <groupId>org.springframework.ai</groupId>
     <artifactId>spring-ai-starter-mcp-client</artifactId>
 </dependency>
 ```
-puis on configurer
+Puis on configure :
 ```properties
 spring.ai.mcp.client.streamable-http.connections.customers.url=http://localhost:8081/mcp
 ```
-puis on ajoutans dans `EbankAIAgent` service la fonctionaliter de au demarage il va chercher les tools 
+Puis on ajoute dans le service `EbankAIAgent` la fonctionnalité qui, au démarrage, va chercher les outils :
 ```java
 public EbankAIAgent(
         ChatClient.Builder chatClient,
@@ -227,14 +227,14 @@ public EbankAIAgent(
             .build();
 }
 ```
-On le teste, on le demande liste des clients :
-![http://localhost:8083/swagger-ui/index.html testing avec liste des clients](screenShots/25.png) \
+On le teste en demandant la liste des clients :
+![http://localhost:8083/swagger-ui/index.html test avec la liste des clients](screenShots/25.png) \
 
-On le demande de `nom de client numero 1`
-![http://localhost:8083/swagger-ui/index.html testing avec save un client](screenShots/26.png) \
+On lui demande le nom du client numéro 1 :
+![http://localhost:8083/swagger-ui/index.html test avec l'enregistrement d'un client](screenShots/26.png) \
 
-Maintenant on va deliminer et limiter chatbot pour juste repondre au question concerner les client el les comptes \
-On ajoutons `defaultSystem` dans `EbankAIAgent`
+Maintenant, on va délimiter et limiter le chatbot pour qu'il réponde uniquement aux questions concernant les clients et les comptes. \
+On ajoute `defaultSystem` dans `EbankAIAgent` :
 ```java
 public EbankAIAgent(
         ChatClient.Builder chatClient,
@@ -254,18 +254,18 @@ public EbankAIAgent(
             .build();
 }
 ```
-On le test avec la prompt `je veux manger`
-![http://localhost:8083/swagger-ui/index.html testing avec prompt hors context](screenShots/27.png) \
+On le teste avec le prompt `je veux manger` :
+![http://localhost:8083/swagger-ui/index.html test avec un prompt hors contexte](screenShots/27.png) \
 
-On fait la meme chose avec `Ebank-service` \
-On ajoutons le depandence `mcp`
+On fait la même chose avec `Ebank-service`. \
+On ajoute la dépendance `mcp` :
 ```xml
 <dependency>
     <groupId>org.springframework.ai</groupId>
     <artifactId>spring-ai-starter-mcp-server-webmvc</artifactId>
 </dependency>
 ```
-Puis on ajoutons les annotations de `MCP` dans `EbankService`
+Puis on ajoute les annotations `MCP` dans `EbankService` :
 ```java
 @Service
 public class EbankService {
@@ -304,22 +304,22 @@ public class EbankService {
     }
 }
 ```
-et on ajoutons mcp dans `application.properties`
+Et on ajoute la configuration MCP dans `application.properties` :
 ```properties
 spring.ai.mcp.client.streamable-http.connections.ebank.url=http://localhost:8082/mcp
 ```
-Remarque : Comme la clé API fournie sur Classroom a été publiée sur GitHub et qu’elle n’est désormais plus fonctionnelle, et que les limites d’utilisation de Gemini sont rapidement atteintes, 
-je ne peux pas fournir de captures d’écran illustrant le fonctionnement du chatbot.
+Remarque : la clé API fournie sur Classroom a été publiée sur GitHub et n'est donc plus fonctionnelle, et les limites d'utilisation de Gemini sont rapidement atteintes.
+Je ne peux donc pas fournir de captures d'écran illustrant le fonctionnement du chatbot.
 
-on rendre l'affichage de reponse de chatbot, \
-dans `EbankChatbotController`
+On améliore l'affichage de la réponse du chatbot, \
+dans `EbankChatbotController` :
 ```java
     @GetMapping("/chat", produces = MediaType.TEXT_PLAIN_VALUE)
 ```
 
 [//]: # (output using the gateway to get clients and bank accounts)
 ## 5 - Tester le chatbot avec un client Discord
-On ajoutons la dependace de `discord` dans `ebank-bot`
+On ajoute la dépendance `discord` dans `ebank-bot` :
 ```xml
 <dependency>
     <groupId>com.zgamelogic</groupId>
@@ -327,7 +327,7 @@ On ajoutons la dependace de `discord` dans `ebank-bot`
     <version>5.0.4</version>
 </dependency>
 ```
-on creer la class `DiscordBot`
+On crée la classe `DiscordBot` :
 ```java
 @DiscordController
 public class DiscordBot {
@@ -345,28 +345,28 @@ public class DiscordBot {
     }
 }
 ```
-et on change `application.properties`
+Et on modifie `application.properties` :
 ```properties
 discord.token=${DISCORD_TOKEN}
 ```
-pour avoir `DISCORD_TOKEN` on accceder `https://discord.com/developers/applications?new_application=true` \
-on creer une application \
-![creationo d'une application discord](screenShots/28.png) \
-puis on entrer la fentere `bot` et puis `reset token` \
-![reset token pour le bot](screenShots/29.png) \
-puis on activer les droits :
-![les droits de bot](screenShots/30.png) \
-puis on creer un serveur discord \
-![serveur discord](screenShots/31.png) \
-puis on entrer l'instalation tab dans `https://discord.com/developers/applications/`
-et on copie le lien d'application, et on ajouter le bot a un serveur. \
-![serveur discord](screenShots/32.png) \
+Pour obtenir `DISCORD_TOKEN`, on accède à `https://discord.com/developers/applications?new_application=true` \
+On crée une application \
+![Création d'une application Discord](screenShots/28.png) \
+Puis on ouvre l'onglet `bot`, puis `Reset Token` \
+![Reset du token du bot](screenShots/29.png) \
+Puis on active les droits :
+![Les droits du bot](screenShots/30.png) \
+Puis on crée un serveur Discord \
+![Serveur Discord](screenShots/31.png) \
+Puis on ouvre l'onglet Installation dans `https://discord.com/developers/applications/`,
+on copie le lien d'installation de l'application et on ajoute le bot à un serveur. \
+![Serveur Discord](screenShots/32.png) \
 
 
 
 
-## 6 - Tester le chatbot avec un Client Telegram
-On ajoutons la depandance de `telegram` dans `ebank-bot`
+## 6 - Tester le chatbot avec un client Telegram
+On ajoute la dépendance `telegram` dans `ebank-bot` :
 ```xml
 <dependency>
     <groupId>org.telegram</groupId>
@@ -374,13 +374,13 @@ On ajoutons la depandance de `telegram` dans `ebank-bot`
     <version>6.9.7.1</version>
 </dependency>
 ```
-apres on creer un bot utilisant `bot-father`
-![bot father conversation](screenShots/33.png) \
-et on ajoutons dans `application.properties`
+Ensuite, on crée un bot avec `BotFather` :
+![Conversation avec BotFather](screenShots/33.png) \
+Puis on ajoute dans `application.properties` :
 ```properties
 telegram.token=${TELEGRAM_TOKEN}
 ```
-Et dans la class `telegram.TelegramBot`
+Et dans la classe `telegram.TelegramBot` :
 ```java
 @Component
 public class TelegramBot extends TelegramLongPollingBot {
@@ -442,8 +442,8 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 }
 ```
-on update `query` from string to prompt
-dans `EbankChatbotController` \
+On modifie le paramètre `query` : de `String`, il devient un `Prompt`,
+dans `EbankChatbotController` : \
 ```java
 @GetMapping("/chat", produces = MediaType.TEXT_PLAIN_VALUE)
     public String chat(
@@ -453,7 +453,7 @@ dans `EbankChatbotController` \
         return ebankAIAgent.chat(new Prompt(query), conversationId);
     }
 ```
-dans `DiscordBot.java`
+Dans `DiscordBot.java` :
 ```java
 @Component
 public class TelegramBot extends TelegramLongPollingBot {
@@ -534,11 +534,11 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 }
 ```
-puis on resoudere le conflit entre `telegram` et `discovery-service` \
-dans le fichier `application.properties` on ajoutons
+Puis on résout le conflit entre `telegram` et `discovery-service`. \
+Dans le fichier `application.properties`, on ajoute :
 ```properties
 eureka.client.jersey.enabled=flase
 ```
-le discovery-service  a creer ce bean, c'est parce que on n'a pas besoin de creer dans telegram.
+Le `discovery-service` a déjà créé ce bean, il n'est donc pas nécessaire de le créer dans Telegram.
 
 [//]: # (image de tesing le bot utilisant telegram)
